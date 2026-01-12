@@ -4,6 +4,11 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 
+// Helper to convert Uint8Array to ArrayBuffer for Web Crypto API
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+}
+
 // MD5 implementation for OpenSSL EVP_BytesToKey compatibility
 // Based on RFC 1321 reference implementation
 function md5(data: Uint8Array): Uint8Array {
@@ -157,7 +162,7 @@ function evpBytesToKey(
 
   while (resultOffset < totalLen) {
     // Concatenate previous hash (if any) + password + salt
-    const toHash = new Uint8Array(
+    const toHash: Uint8Array = new Uint8Array(
       (prevHash ? prevHash.length : 0) + passwordBytes.length + salt.length
     );
     let offset = 0;
@@ -212,7 +217,7 @@ async function pbkdf2Derive(
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: toArrayBuffer(salt),
       iterations: iterations,
       hash: 'SHA-256'
     },
@@ -259,16 +264,16 @@ async function decryptOpenSSL(encryptedBase64: string, password: string): Promis
 
     const aesKey = await crypto.subtle.importKey(
       'raw',
-      key,
+      toArrayBuffer(key),
       { name: 'AES-CBC', length: 256 },
       false,
       ['decrypt']
     );
 
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-CBC', iv: iv },
+      { name: 'AES-CBC', iv: toArrayBuffer(iv) },
       aesKey,
-      ciphertext
+      toArrayBuffer(ciphertext)
     );
 
     console.log('PBKDF2 decryption succeeded!');
@@ -292,16 +297,16 @@ async function decryptOpenSSL(encryptedBase64: string, password: string): Promis
 
       const aesKey = await crypto.subtle.importKey(
         'raw',
-        key,
+        toArrayBuffer(key),
         { name: 'AES-CBC', length: keyLen * 8 },
         false,
         ['decrypt']
       );
 
       const decrypted = await crypto.subtle.decrypt(
-        { name: 'AES-CBC', iv: iv },
+        { name: 'AES-CBC', iv: toArrayBuffer(iv) },
         aesKey,
-        ciphertext
+        toArrayBuffer(ciphertext)
       );
 
       console.log('EVP_BytesToKey decryption succeeded with', hash, keyLen);
@@ -376,7 +381,7 @@ async function decryptAES(encryptedBase64: string, password: string): Promise<st
   const aesKey = await crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: toArrayBuffer(salt),
       iterations: 5000,
       hash: 'SHA-1',
     },
@@ -388,9 +393,9 @@ async function decryptAES(encryptedBase64: string, password: string): Promise<st
 
   // Decrypt
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-CBC', iv: iv },
+    { name: 'AES-CBC', iv: toArrayBuffer(iv) },
     aesKey,
-    ciphertext
+    toArrayBuffer(ciphertext)
   );
 
   return new TextDecoder().decode(decrypted);
