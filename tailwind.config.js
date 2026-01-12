@@ -10,6 +10,15 @@ module.exports = {
       colors: {
         bitcoin: '#F7931A',
         monero: '#FF6600',
+        samourai: {
+          red: '#c62828',
+          crimson: '#b71c1c',
+          dark: '#0d0d0d',
+        },
+        ronin: {
+          red: '#e53935',
+          orange: '#ff5722',
+        },
         dark: {
           900: '#0a0a0a',
           800: '#121212',

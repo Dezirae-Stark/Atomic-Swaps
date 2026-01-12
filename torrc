@@ -1,0 +1,2 @@
+HiddenServiceDir /mnt/d/ronin/AtomicSwaps/.tor_hidden_service
+HiddenServicePort 80 127.0.0.1:3001

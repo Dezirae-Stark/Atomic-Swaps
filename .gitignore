@@ -36,3 +36,6 @@ next-env.d.ts
 # Editor
 .vscode
 .idea
+
+# Tor hidden service (contains private keys)
+.tor_hidden_service/

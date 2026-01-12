@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* JANSINA Font */
+@font-face {
+  font-family: 'Jansina';
+  src: url('/fonts/jansina.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 10, 10, 10;
@@ -10,13 +19,56 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
   min-height: 100vh;
+  position: relative;
+}
+
+/* Background image - Full clarity, demon centered */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/samourai_demon.webp');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  opacity: 0.85;
+  z-index: -2;
+}
+
+/* Minimal overlay - just enough for text contrast */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(13, 13, 13, 0.4) 0%,
+    rgba(13, 13, 13, 0.2) 40%,
+    rgba(13, 13, 13, 0.2) 60%,
+    rgba(13, 13, 13, 0.5) 100%
+  );
+  z-index: -1;
+}
+
+/* Text shadow for readability against background */
+.text-readable {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+/* Glassmorphism card for content areas */
+.glass-card {
+  background: rgba(13, 13, 13, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(198, 40, 40, 0.3);
 }
 
 @layer utilities {
@@ -44,13 +96,17 @@ body {
   background: #555;
 }
 
-/* Glow effects */
+/* Glow effects - Samourai themed */
 .glow-bitcoin {
-  box-shadow: 0 0 20px rgba(247, 147, 26, 0.3);
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.4);
 }
 
 .glow-monero {
-  box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.4);
+}
+
+.glow-samourai {
+  box-shadow: 0 0 25px rgba(198, 40, 40, 0.5);
 }
 
 /* Animation */
@@ -67,32 +123,62 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Card styles */
+/* Card styles - Glassmorphism with Samourai accent */
 .card {
-  @apply bg-dark-700 border border-dark-600 rounded-xl p-6;
+  @apply rounded-xl p-6;
+  background: rgba(13, 13, 13, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(198, 40, 40, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .card-hover {
-  @apply hover:border-dark-600/80 hover:bg-dark-600/50 transition-all duration-200;
+  @apply transition-all duration-200;
 }
 
-/* Input styles */
+.card-hover:hover {
+  border-color: rgba(198, 40, 40, 0.5);
+  box-shadow: 0 8px 32px rgba(198, 40, 40, 0.15);
+}
+
+/* Input styles - Samourai themed */
 input[type="text"],
 input[type="number"],
 input[type="password"] {
-  @apply bg-dark-800 border border-dark-600 rounded-lg px-4 py-3 text-white
-         focus:border-bitcoin focus:ring-1 focus:ring-bitcoin focus:outline-none
-         placeholder:text-gray-500;
+  @apply rounded-lg px-4 py-3 text-white placeholder:text-gray-400;
+  background: rgba(13, 13, 13, 0.9);
+  border: 1px solid rgba(198, 40, 40, 0.3);
 }
 
-/* Button styles */
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: #c62828;
+  box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.25);
+}
+
+/* Button styles - Samourai red */
 .btn-primary {
-  @apply bg-bitcoin hover:bg-bitcoin/90 text-white font-semibold py-3 px-6
-         rounded-lg transition-all duration-200 disabled:opacity-50
-         disabled:cursor-not-allowed;
+  @apply text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200
+         disabled:opacity-50 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, #c62828, #b71c1c);
+  box-shadow: 0 4px 15px rgba(198, 40, 40, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e53935, #c62828);
+  box-shadow: 0 6px 20px rgba(198, 40, 40, 0.4);
 }
 
 .btn-secondary {
-  @apply bg-dark-600 hover:bg-dark-600/80 text-white font-semibold py-3 px-6
-         rounded-lg transition-all duration-200 border border-dark-600;
+  @apply text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  background: rgba(13, 13, 13, 0.8);
+  border: 1px solid rgba(198, 40, 40, 0.4);
+}
+
+.btn-secondary:hover {
+  border-color: rgba(198, 40, 40, 0.7);
+  background: rgba(198, 40, 40, 0.15);
 }
