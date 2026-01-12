@@ -182,3 +182,39 @@ input[type="password"]:focus {
   border-color: rgba(198, 40, 40, 0.7);
   background: rgba(198, 40, 40, 0.15);
 }
+
+/* QR Scanner Styles */
+#qr-reader {
+  border: none !important;
+  background: transparent !important;
+}
+
+#qr-reader video {
+  border-radius: 12px !important;
+  object-fit: cover !important;
+}
+
+#qr-reader__scan_region {
+  background: transparent !important;
+}
+
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+/* Border width utilities for scanner viewfinder */
+.border-3 {
+  border-width: 3px;
+}
+
+/* QR scan button icon */
+.qr-scan-btn {
+  @apply p-2 rounded-lg transition-all duration-200;
+  background: rgba(198, 40, 40, 0.2);
+  border: 1px solid rgba(198, 40, 40, 0.4);
+}
+
+.qr-scan-btn:hover {
+  background: rgba(198, 40, 40, 0.3);
+  border-color: rgba(198, 40, 40, 0.6);
+}

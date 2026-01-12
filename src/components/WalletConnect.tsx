@@ -12,6 +12,7 @@ import {
   deriveSwapWallet,
 } from '@/lib/wallet';
 import { WalletState } from '@/types';
+import { QRScanner } from './QRScanner';
 
 interface WalletConnectProps {
   onConnect: (wallet: WalletState, mnemonic?: string, passphrase?: string) => void;
@@ -31,6 +32,8 @@ export function WalletConnect({ onConnect }: WalletConnectProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'pairing' | 'password'>('pairing');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showSeedScanner, setShowSeedScanner] = useState(false);
 
   const handlePaste = async () => {
     try {
@@ -280,9 +283,8 @@ export function WalletConnect({ onConnect }: WalletConnectProps) {
           </button>
 
           <button
-            onClick={() => setMethod('scan')}
-            className="w-full btn-secondary flex items-center justify-center gap-3 opacity-50"
-            disabled
+            onClick={() => setShowQRScanner(true)}
+            className="w-full btn-secondary flex items-center justify-center gap-3"
           >
             <svg
               className="w-5 h-5"
@@ -297,7 +299,7 @@ export function WalletConnect({ onConnect }: WalletConnectProps) {
                 d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
               />
             </svg>
-            Scan QR Code (Coming Soon)
+            Scan QR Code
           </button>
         </div>
       ) : method === 'backup' ? (
@@ -440,8 +442,18 @@ export function WalletConnect({ onConnect }: WalletConnectProps) {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Seed Words (Mnemonic)
+            <label className="flex items-center justify-between text-sm text-gray-400 mb-2">
+              <span>Seed Words (Mnemonic)</span>
+              <button
+                type="button"
+                onClick={() => setShowSeedScanner(true)}
+                className="flex items-center gap-1 text-samourai-red hover:text-ronin-red transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+                Scan QR
+              </button>
             </label>
             <textarea
               value={manualMnemonic}
@@ -705,6 +717,49 @@ export function WalletConnect({ onConnect }: WalletConnectProps) {
           performed locally in your browser.
         </p>
       </div>
+
+      {/* QR Scanner for Pairing Code */}
+      <QRScanner
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={(data) => {
+          setPairingCode(data);
+          setShowQRScanner(false);
+          setMethod('paste');
+        }}
+        title="Scan Pairing QR"
+        description="Scan pairing QR from Samourai/Ashigaru wallet or select an image"
+        validate={(data) => {
+          try {
+            const payload = JSON.parse(data);
+            if (payload.pairing?.type === 'swaps.gui') {
+              return { valid: true };
+            }
+            return { valid: false, error: 'Invalid pairing type. Expected swaps.gui' };
+          } catch {
+            return { valid: false, error: 'Invalid JSON format' };
+          }
+        }}
+      />
+
+      {/* QR Scanner for Seed Phrase */}
+      <QRScanner
+        isOpen={showSeedScanner}
+        onClose={() => setShowSeedScanner(false)}
+        onScan={(data) => {
+          setManualMnemonic(data);
+          setShowSeedScanner(false);
+        }}
+        title="Scan Seed Phrase"
+        description="Scan a QR code containing your seed words or select an image"
+        validate={(data) => {
+          const words = data.trim().toLowerCase().split(/\s+/);
+          if (words.length === 12 || words.length === 24) {
+            return { valid: true };
+          }
+          return { valid: false, error: 'Expected 12 or 24 seed words' };
+        }}
+      />
     </div>
   );
 }

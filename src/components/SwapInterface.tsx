@@ -8,6 +8,7 @@ import { SwapWallet } from '@/lib/bitcoin/swapWallet';
 import { useSwapExecutor, useSwapHistory } from '@/hooks/useSwapExecutor';
 import { SwapPhase, SwapState } from '@/lib/swap/state';
 import { isValidMoneroAddress } from '@/lib/monero/address';
+import { QRScanner } from './QRScanner';
 
 interface SwapInterfaceProps {
   wallet: WalletState;
@@ -67,6 +68,7 @@ export function SwapInterface({ wallet, swapWallet }: SwapInterfaceProps) {
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [btcAmount, setBtcAmount] = useState('');
   const [xmrAddress, setXmrAddress] = useState('');
+  const [showXmrScanner, setShowXmrScanner] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [pendingQuote, setPendingQuote] = useState<any>(null);
 
@@ -409,8 +411,18 @@ export function SwapInterface({ wallet, swapWallet }: SwapInterfaceProps) {
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Monero Receive Address
+              <label className="flex items-center justify-between text-sm text-gray-400 mb-2">
+                <span>Monero Receive Address</span>
+                <button
+                  type="button"
+                  onClick={() => setShowXmrScanner(true)}
+                  className="flex items-center gap-1 text-samourai-red hover:text-ronin-red transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                  Scan QR
+                </button>
               </label>
               <input
                 type="text"
@@ -646,6 +658,28 @@ export function SwapInterface({ wallet, swapWallet }: SwapInterfaceProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* QR Scanner for Monero Address */}
+      <QRScanner
+        isOpen={showXmrScanner}
+        onClose={() => setShowXmrScanner(false)}
+        onScan={(data) => {
+          setXmrAddress(data);
+          setShowXmrScanner(false);
+        }}
+        title="Scan Monero Address"
+        description="Scan a Monero address QR code or select an image"
+        validate={(data) => {
+          const expectedNetwork = wallet.network === 'mainnet' ? 'mainnet' : 'testnet';
+          if (isValidMoneroAddress(data, expectedNetwork)) {
+            return { valid: true };
+          }
+          return {
+            valid: false,
+            error: `Invalid Monero address for ${expectedNetwork}`,
+          };
+        }}
+      />
     </div>
   );
 }

@@ -36,6 +36,7 @@
     "cbor-x": "^1.5.9",
     "clsx": "^2.1.1",
     "framer-motion": "^11.2.0",
+    "html5-qrcode": "^2.3.8",
     "it-length-prefixed": "^9.0.4",
     "it-pipe": "^3.0.1",
     "libp2p": "^1.4.3",
