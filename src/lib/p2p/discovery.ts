@@ -10,6 +10,10 @@ import {
   ASB_PROTOCOL_QUOTE,
 } from './types';
 
+// Local OB bootstrap node — primary discovery source
+const BOOTSTRAP_URL = process.env.BOOTSTRAP_URL || 'http://127.0.0.1:9001';
+const SWAPS_ONION = process.env.SWAPS_ONION || '';
+
 // Provider cache with TTL
 interface ProviderCache {
   providers: DiscoveredProvider[];
@@ -109,24 +113,52 @@ export class ProviderDiscovery {
     }
   }
 
-  // Fetch providers from rendezvous points
+  // Fetch providers from the local OB bootstrap node
   private async fetchProvidersFromRendezvous(): Promise<DiscoveredProvider[]> {
-    // For now, simulate discovery with fallback providers
-    // In a full implementation, this would:
-    // 1. Create a libp2p node with noise encryption and yamux muxing
-    // 2. Connect to rendezvous points via Tor (if proxy configured)
-    // 3. Use the rendezvous protocol to discover ASBs
-    // 4. Query each ASB for their current quote
+    try {
+      const res = await fetch(`${BOOTSTRAP_URL}/v1/swap-providers`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error(`Bootstrap returned ${res.status}`);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      const data = await res.json();
+      const raw: any[] = data.providers ?? [];
+      if (raw.length === 0) return FALLBACK_PROVIDERS;
 
-    // Return providers with randomized availability
-    return FALLBACK_PROVIDERS.map(provider => ({
-      ...provider,
-      lastSeen: new Date(),
-      isOnline: Math.random() > 0.1, // 90% chance online
-    }));
+      const nowSecs = Math.floor(Date.now() / 1000);
+
+      return raw.map((p): DiscoveredProvider => {
+        const peerId = Buffer.from(p.provider_pubkey as number[]).toString('hex');
+        const xmrPerBtc: number = p.rate?.xmr_per_btc ?? 0;
+        // xmr_per_btc is the Kraken XMR/BTC ticker (BTC cost per XMR, e.g. 0.005195).
+        // piconero per satoshi = 1e12 / (xmr_per_btc * 1e8) = 1e4 / xmr_per_btc
+        const priceInPiconeroPerSat = xmrPerBtc > 0
+          ? BigInt(Math.round(1e4 / xmrPerBtc))
+          : BigInt(0);
+
+        const quote: AsbQuoteResponse = {
+          price: priceInPiconeroPerSat,
+          min_quantity: BigInt(p.swap_config?.min_btc_sats ?? 0),
+          max_quantity: BigInt(p.swap_config?.max_btc_sats ?? 0),
+          xmr_amount: BigInt(0),
+        };
+
+        const onion: string = p.onion_address;
+        const multiaddr = onion === 'auto' && SWAPS_ONION ? SWAPS_ONION : onion;
+
+        return {
+          peerId,
+          multiaddrs: multiaddr && multiaddr !== 'auto' ? [multiaddr] : [],
+          namespace: RENDEZVOUS_NAMESPACE,
+          quote,
+          lastSeen: new Date((p.timestamp as number) * 1000),
+          isOnline: nowSecs - (p.timestamp as number) < 600,
+        };
+      });
+    } catch (err) {
+      console.warn('Bootstrap discovery failed, using fallback:', err);
+      return FALLBACK_PROVIDERS;
+    }
   }
 
   // Get a quote from a specific provider

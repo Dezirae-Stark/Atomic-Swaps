@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveSwaps, getSwapById } from '@/lib/p2p/swapExecution';
+import { getActiveSwaps, getSwapById, SwapExecution } from '@/lib/p2p/swapExecution';
+import {
+  DiscoveredProvider,
+  AsbQuoteResponse,
+  RENDEZVOUS_NAMESPACE,
+} from '@/lib/p2p/types';
 
 export const dynamic = 'force-dynamic';
+
+// Bootstrap URL for looking up registered providers
+const BOOTSTRAP_URL = process.env.BOOTSTRAP_URL || 'http://127.0.0.1:9001';
+
+// Onion address for the local swap provider (used when bootstrap returns "auto")
+const SWAPS_ONION = process.env.SWAPS_ONION || '';
 
 // GET - List all swaps or get specific swap
 export async function GET(request: NextRequest) {
@@ -61,9 +72,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, return a simulated swap initiation
-    // In production, this would start the actual swap execution
-    const swapId = crypto.randomUUID();
+    // Look up provider from bootstrap to get real rate and limits
+    const provider = await fetchProviderById(String(providerId));
+    if (!provider) {
+      return NextResponse.json(
+        { error: 'Provider not found or offline' },
+        { status: 404 }
+      );
+    }
+
+    // btcAmount is satoshis (number) from the client
+    const btcSatoshis = BigInt(Math.round(Number(btcAmount)));
+    const priceInPiconeroPerSat = provider.quote?.price ?? BigInt(0);
+    const xmrPiconero = priceInPiconeroPerSat > 0n
+      ? btcSatoshis * priceInPiconeroPerSat
+      : BigInt(0);
+
+    // Create a tracked SwapExecution — constructor registers it in activeSwaps
+    const execution = new SwapExecution(
+      provider,
+      btcSatoshis,
+      xmrPiconero,
+      xmrReceiveAddress,
+      btcRefundAddress,
+    );
+    const swapId = execution.getState().id;
+
+    // Run swap phases in background; caller polls GET for progress
+    execution.execute().catch((err) => {
+      console.error(`Swap ${swapId} execution error:`, err);
+    });
 
     return NextResponse.json({
       success: true,
@@ -79,7 +117,85 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper functions
+// ─── Bootstrap lookup ────────────────────────────────────────────────────────
+
+interface BootstrapProvider {
+  provider_pubkey: number[];
+  onion_address: string;
+  swap_config: {
+    min_btc_sats: number;
+    max_btc_sats: number;
+    spread_percentage: number;
+    btc_cancel_timelock_blocks: number;
+    xmr_confirm_blocks: number;
+  };
+  rate: {
+    xmr_per_btc: number;
+    source: string;
+    rate_timestamp: number;
+  };
+  reputation: {
+    uptime_percentage: number;
+  };
+  timestamp: number;
+}
+
+async function fetchProviderById(peerId: string): Promise<DiscoveredProvider | null> {
+  try {
+    const res = await fetch(`${BOOTSTRAP_URL}/v1/swap-providers`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const providers: BootstrapProvider[] = data.providers ?? [];
+
+    const match = providers.find((p) => {
+      const hex = Buffer.from(p.provider_pubkey).toString('hex');
+      return hex === peerId;
+    });
+    if (!match) return null;
+
+    // Convert bootstrap rate to piconero-per-satoshi price.
+    // xmr_per_btc is the Kraken XMR/BTC ticker: BTC cost for 1 XMR (e.g. 0.005195 BTC/XMR).
+    // 1 XMR costs xmr_per_btc * 1e8 satoshis, so:
+    //   piconero per satoshi = 1e12 / (xmr_per_btc * 1e8) = 1e4 / xmr_per_btc
+    const xmrPerBtc = match.rate?.xmr_per_btc ?? 0;
+    const priceInPiconeroPerSat = xmrPerBtc > 0
+      ? BigInt(Math.round(1e4 / xmrPerBtc))
+      : BigInt(0);
+
+    const quote: AsbQuoteResponse = {
+      price: priceInPiconeroPerSat,
+      min_quantity: BigInt(match.swap_config.min_btc_sats),
+      max_quantity: BigInt(match.swap_config.max_btc_sats),
+      xmr_amount: BigInt(0),
+    };
+
+    // "auto" means use the configured onion address for this node
+    const multiaddr = match.onion_address === 'auto' && SWAPS_ONION
+      ? SWAPS_ONION
+      : match.onion_address;
+
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const isOnline = nowSecs - match.timestamp < 600;
+
+    return {
+      peerId,
+      multiaddrs: multiaddr ? [multiaddr] : [],
+      namespace: RENDEZVOUS_NAMESPACE,
+      quote,
+      lastSeen: new Date(match.timestamp * 1000),
+      isOnline,
+    };
+  } catch (err) {
+    console.error('Bootstrap lookup failed:', err);
+    return null;
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatSwapState(swap: any) {
   return {
     id: swap.id,
